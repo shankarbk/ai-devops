@@ -178,12 +178,53 @@ devops-agent/
     <details>
     <summary>Deployment steps</summary>
 
-    1. Required tools: kubectl, AWS CLI and eksctl (optional but useful). Everything runs from your local terminal.
-    2. Configure AWS credentials (if needed)
-    3. Run Terraform to create the EKS cluster (terraform-cost-optimised)
-    4. Connect kubectl to your EKS cluster
+    1. **Prerequisites — what you need on your laptop**   
+        kubectl, AWS CLI and eksctl (optional but useful). Everything runs from your local terminal.
+        1. Check what you already have
+            ```
+            # Check kubectl — you already have this from kind
+            kubectl version --client
+            # Expected: Client Version: v1.xx.x
+
+            # Check AWS CLI
+            aws --version
+            # If missing, install: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+
+            # Check if AWS credentials are configured
+            aws sts get-caller-identity
+            # Expected: {"UserId": "...", "Account": "123456789012", "Arn": "arn:aws:iam::..."}
+            # If error: run 'aws configure' and enter your Access Key ID + Secret
+            ```
+        2. Configure AWS credentials (if needed)
+            ```
+            aws configure
+            # AWS Access Key ID: AKIA...your key...
+            # AWS Secret Access Key: ...your secret...
+            # Default region name: us-east-1
+            # Default output format: json
+
+            # Verify it works
+            aws sts get-caller-identity
+            ```
+
+        3. Run Terraform to create the EKS cluster
+            ```
+            cd terraform/
+            cp terraform.tfvars.example terraform.tfvars
+
+            # Edit terraform.tfvars — set your IP for security
+            # allowed_cidr = "$(curl -s ifconfig.me)/32"
+
+            terraform init
+            terraform apply -auto-approve
+
+            # Takes 12–18 minutes. Get a coffee.
+            # When done, you'll see outputs including cmd_configure_kubectl
+            ```
+
+    2. **Connect kubectl to your EKS cluster**
         - With kind you ran kind "create cluster" and kubectl auto-configured. With EKS, you run one AWS CLI command that does the same thing — writes a context into your ~/.kube/config.
-        - Point kubectl at EKS
+        1. Point kubectl at EKS
             ```
             # This command fetches the cluster endpoint + auth token from AWS
             # and writes a new context into ~/.kube/config
@@ -196,96 +237,201 @@ devops-agent/
             # Expected output:
             # Added new context arn:aws:eks:us-east-1:123456789:cluster/devops-agent to ~/.kube/config
             ```
-    5. Verify the connection (identical to kind!)
-        ```
-        # Exact same commands you use with kind
-        kubectl get nodes
-        # NAME                          STATUS   ROLES    AGE   VERSION
-        # ip-10-0-1-45.ec2.internal     Ready    <none>   3m    v1.29.x
+        2. Verify the connection (identical to kind!)
+            ```
+            # Exact same commands you use with kind
+            kubectl get nodes
+            # NAME                          STATUS   ROLES    AGE   VERSION
+            # ip-10-0-1-45.ec2.internal     Ready    <none>   3m    v1.29.x
 
-        kubectl get pods -A
-        # NAMESPACE     NAME                      READY   STATUS    RESTARTS
-        # kube-system   aws-node-xxxxx            1/1     Running   0
-        # kube-system   coredns-xxxxxxx           1/1     Running   0
-        # kube-system   kube-proxy-xxxxx          1/1     Running   0
+            kubectl get pods -A
+            # NAMESPACE     NAME                      READY   STATUS    RESTARTS
+            # kube-system   aws-node-xxxxx            1/1     Running   0
+            # kube-system   coredns-xxxxxxx           1/1     Running   0
+            # kube-system   kube-proxy-xxxxx          1/1     Running   0
 
-        # Check current context (like 'kind-kind' for kind clusters)
-        kubectl config current-context
-        # arn:aws:eks:us-east-1:123456789:cluster/devops-agent
-        ```
-    6. Switching between kind and EKS contexts
-        ```
-        # List all contexts in your kubeconfig
-        kubectl config get-contexts
+            # Check current context (like 'kind-kind' for kind clusters)
+            kubectl config current-context
+            # arn:aws:eks:us-east-1:123456789:cluster/devops-agent
+            ```   
+        
+            It really is that simple. Once update-kubeconfig runs, every kubectl command you know from kind works identically on EKS. The auth happens transparently via your AWS credentials.
 
-        # Switch back to your kind cluster
-        kubectl config use-context kind-kind
 
-        # Switch to EKS
-        kubectl config use-context arn:aws:eks:us-east-1:123456789:cluster/devops-agent
+        3. Switching between kind and EKS contexts
+            ```
+            # List all contexts in your kubeconfig
+            kubectl config get-contexts
 
-        # Tip: alias long EKS context names
-        kubectl config rename-context \
-        arn:aws:eks:us-east-1:123456789:cluster/devops-agent \
-        devops-eks
-        ```
+            # Switch back to your kind cluster
+            kubectl config use-context kind-kind
 
-    7. Write the Kubernetes YAML files   
-        Three files: the broken app that will OOMKill, the RBAC so the agent has permission to act, and the agent deployment itself. Create a k8s/ folder in your project root.   
+            # Switch to EKS
+            kubectl config use-context arn:aws:eks:us-east-1:123456789:cluster/devops-agent
+
+            # Tip: alias long EKS context names
+            kubectl config rename-context \
+            arn:aws:eks:us-east-1:123456789:cluster/devops-agent \
+            devops-eks
+            ```
+
+    3. **Write the Kubernetes YAML files**   
+        Three files: the broken app that will OOMKill, the RBAC so the agent has permission to act, and the agent deployment itself. Create a k8s/ folder in your project root.   (k8s/broken-app.yaml, k8s/rbac.yaml, k8s/agent-deployment.yaml)
+
         - what "k8s/broken-app.yaml" does ? : A Python process that allocates 1MB of RAM every 10ms with no upper bound. The container memory limit is 60Mi, so it will OOMKill in under a minute and enter CrashLoopBackOff — exactly what the agent will diagnose and fix.
+
         - Why RBAC ? : By default, a pod has no permission to call the Kubernetes API. Without this, when the agent calls kubectl delete pod via the Python SDK, it gets a 403 Forbidden. RBAC grants exactly the permissions needed — nothing more.
 
-    8. Watch pod status in real time   
-        > kubectl get pods -w
-    
-    9. Read the pod logs (what the agent's tool sees)   
-        ```
-        # Get the exact pod name first
-        POD_NAME=$(kubectl get pods -l app=broken-api -o jsonpath='{.items[0].metadata.name}')
-        echo $POD_NAME
+    4. **Deploy everything — step by step**   
+        All commands from your laptop. Terraform outputs the values you need, then kubectl does the rest — same commands as kind.
+        1. Get values from Terraform
+            ```
+            cd terraform/
+            # Get the IAM role ARN for the agent ServiceAccount
+            AGENT_ROLE_ARN=$(terraform output -raw agent_role_arn)
+            echo $AGENT_ROLE_ARN
+            # arn:aws:iam::123456789:role/devops-agent-agent-pod-role
 
-        # Read logs — same command the agent's get_pod_logs() tool runs
-        kubectl logs $POD_NAME --tail=20
+            # Get ECR URL for the agent image
+            ECR_URL=$(terraform output -raw ecr_repository_url)
+            echo $ECR_URL
+            # 123456789.dkr.ecr.us-east-1.amazonaws.com/devops-agent-agent
 
-        # Expected output:
-        # Starting memory leak simulation...
-        # Allocated 1MB so far
-        # Allocated 2MB so far
-        # ...
-        # Allocated 47MB so far
-        # Killed                          <-- OOMKill. No Python traceback, just "Killed"
+            cd ..
+            ```
+        2. Deploy the broken app (nothing to build, uses public image)
+            ```
+            # Same as 'kubectl apply -f' with kind — no difference at all
+            kubectl apply -f k8s/broken-app.yaml
 
-        # Read previous container's logs (after a crash+restart)
-        kubectl logs $POD_NAME --previous --tail=20
-        ```
-    10. Inspect the OOMKill reason (what the agent's get_pods_status() sees)   
-        ```
-        # Describe shows the full pod state including last termination reason
-        kubectl describe pod $POD_NAME
+            # Expected output:
+            # deployment.apps/broken-api created
+            ```
+        3. Apply RBAC (substitute the IAM role ARN)   
+            What envsubst does: It replaces ${AGENT_ROLE_ARN} in the YAML file with the actual ARN from your environment variable, then pipes the result to kubectl. No manual text editing needed.
 
-        # Look for this section in the output:
-        #   Last State: Terminated
-        #     Reason:   OOMKilled          <-- This is what the agent detects
-        #     Exit Code: 137               <-- 128 + SIGKILL signal number
-        #     Started:   Mon, 15 Jan 2024 10:23:44 +0000
-        #     Finished:  Mon, 15 Jan 2024 10:24:22 +0000
+            ```
+            # export so envsubst can see them
+            export AGENT_ROLE_ARN ECR_URL
 
-        # Also useful — events show the K8s controller's perspective
-        kubectl get events --sort-by='.lastTimestamp'
-        # You'll see: BackOff, Started, Pulling, OOMKilling events
-        ```                   
+            # envsubst replaces ${AGENT_ROLE_ARN} in the yaml with the real value
+            envsubst < k8s/rbac.yaml | kubectl apply -f -
 
-    11. Confirm the full picture before running the agent
-        ```
-        # Quick health check — what you should see before running the agent
-        kubectl get pods
+            # Expected output:
+            # serviceaccount/devops-agent created
+            # clusterrole.rbac.authorization.k8s.io/devops-agent-role created
+            # clusterrolebinding.rbac.authorization.k8s.io/devops-agent-binding created
 
-        # NAME                          READY   STATUS             RESTARTS   AGE
-        # broken-api-7d4f8b-abc12       0/1     CrashLoopBackOff   5          8m    ← agent will fix this
-        # devops-agent-xxx              1/1     Running            0          3m    ← this is the agent
-        ```
+            # Verify ServiceAccount was created with the annotation
+            kubectl get serviceaccount devops-agent -o yaml
+            # Look for: eks.amazonaws.com/role-arn: arn:aws:iam::...
+            ```   
 
-    12. Run the agent and watch it self-heal   
+            If you don't have envsubst (macOS users): install with brew install gettext. Alternative: manually replace ${AGENT_ROLE_ARN} in rbac.yaml with the actual ARN and apply directly.
+
+        4. Build and push the agent image to ECR
+            ```
+            # Step 1: Authenticate Docker to ECR (token valid 12 hours)
+            aws ecr get-login-password --region us-east-1 | \
+            docker login --username AWS --password-stdin $ECR_URL
+
+            # Step 2: Build the agent image
+            # --platform linux/amd64: EKS nodes run x86_64, even on Apple Silicon Macs
+            docker build \
+            --platform linux/amd64 \
+            --tag $ECR_URL:latest \
+            .
+
+            # Step 3: Push to ECR
+            docker push $ECR_URL:latest
+
+            # Verify image is in ECR
+            aws ecr describe-images \
+            --repository-name devops-agent-agent \
+            --query 'imageDetails[*].[imageTags,imageSizeInBytes]'
+            ```
+
+        5. Deploy the agent
+            ```
+            # Substitute ECR_URL into the deployment yaml and apply
+            envsubst < k8s/agent-deployment.yaml | kubectl apply -f -
+
+            # Expected:
+            # deployment.apps/devops-agent created
+            # service/devops-agent-svc created
+
+            # Wait for agent pod to be Running
+            kubectl rollout status deployment/devops-agent --timeout=120s
+            # Waiting for deployment "devops-agent" rollout to finish...
+            # deployment "devops-agent" successfully rolled out
+            ```
+
+    5. **Watch the broken app fail in real time**
+        1. Watch pod status in real time   
+            ```
+            # -w flag = watch mode. Updates live. Ctrl+C to stop.
+            kubectl get pods -w
+
+            # You'll see this progression over ~90 seconds:
+            #
+            # NAME                          READY   STATUS              RESTARTS   AGE
+            # broken-api-7d4f8b-abc12       0/1     ContainerCreating   0          5s
+            # broken-api-7d4f8b-abc12       1/1     Running             0          12s
+            # broken-api-7d4f8b-abc12       0/1     OOMKilled           0          38s    <-- memory limit hit!
+            # broken-api-7d4f8b-abc12       0/1     CrashLoopBackOff    1          45s    <-- K8s backs off restarts
+            # broken-api-7d4f8b-abc12       1/1     Running             1          75s    <-- K8s retries
+            # broken-api-7d4f8b-abc12       0/1     OOMKilled           1          112s   <-- OOMKill again
+            ```
+        
+        2. Read the pod logs (what the agent's tool sees)   
+            ```
+            # Get the exact pod name first
+            POD_NAME=$(kubectl get pods -l app=broken-api -o jsonpath='{.items[0].metadata.name}')
+            echo $POD_NAME
+
+            # Read logs — same command the agent's get_pod_logs() tool runs
+            kubectl logs $POD_NAME --tail=20
+
+            # Expected output:
+            # Starting memory leak simulation...
+            # Allocated 1MB so far
+            # Allocated 2MB so far
+            # ...
+            # Allocated 47MB so far
+            # Killed                          <-- OOMKill. No Python traceback, just "Killed"
+
+            # Read previous container's logs (after a crash+restart)
+            kubectl logs $POD_NAME --previous --tail=20
+            ```
+
+        3. Inspect the OOMKill reason (what the agent's get_pods_status() sees)   
+            ```
+            # Describe shows the full pod state including last termination reason
+            kubectl describe pod $POD_NAME
+
+            # Look for this section in the output:
+            #   Last State: Terminated
+            #     Reason:   OOMKilled          <-- This is what the agent detects
+            #     Exit Code: 137               <-- 128 + SIGKILL signal number
+            #     Started:   Mon, 15 Jan 2024 10:23:44 +0000
+            #     Finished:  Mon, 15 Jan 2024 10:24:22 +0000
+
+            # Also useful — events show the K8s controller's perspective
+            kubectl get events --sort-by='.lastTimestamp'
+            # You'll see: BackOff, Started, Pulling, OOMKilling events
+            ```                   
+
+        4. Confirm the full picture before running the agent
+            ```
+            # Quick health check — what you should see before running the agent
+            kubectl get pods
+
+            # NAME                          READY   STATUS             RESTARTS   AGE
+            # broken-api-7d4f8b-abc12       0/1     CrashLoopBackOff   5          8m    ← agent will fix this
+            # devops-agent-xxx              1/1     Running            0          3m    ← this is the agent
+            ```
+
+    6. **Run the agent and watch it self-heal**   
         Two options: invoke locally (faster for testing), or invoke via the running pod. Both hit the same agent logic.
         1. Option A: Run agent directly from your laptop (easiest)   
             This works because: your laptop has AWS credentials + your kubeconfig already points at EKS. The agent Python code uses both — boto3 for Bedrock, kubernetes SDK for K8s API. No pod needed.

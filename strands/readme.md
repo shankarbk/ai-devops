@@ -2,20 +2,20 @@
 A tool-calling agent that reads K8s pod logs and metrics, identifies root causes (OOMKilled, CrashLoopBackOff, etc.), and autonomously runs remediation — pod restarts, HPA scaling, and alerting.
 
 ## Overview (Creating projct steps)
-1. **Agent Framework**: Strands SDK
-AWS's open-source Python SDK for building tool-calling agents. Clean, minimal, works natively with Bedrock models and AgentCore.
+1. **Agent Framework**: Strands SDK   
+    AWS's open-source Python SDK for building tool-calling agents. Clean, minimal, works natively with Bedrock models and AgentCore.
 
-2. **Runtime**: EKS on t3.micro
-Kubernetes cluster via custom Terraform (no pre-built modules). Sized for Free Tier — t3.micro nodes, minimal node group.
+2. **Runtime**: EKS on t3.micro   
+    Kubernetes cluster via custom Terraform (no pre-built modules). Sized for Free Tier — t3.micro nodes, minimal node group.
 
-3. **Tools**: kubectl + CloudWatch
-4 agent tools: get_pod_logs, get_pod_metrics, restart_pod, scale_deployment. Each mapped to a Python function.
+3. **Tools**: kubectl + CloudWatch   
+    4 agent tools: get_pod_logs, get_pod_metrics, restart_pod, scale_deployment. Each mapped to a Python function.
 
-4. **LLM**: Claude 3 Haiku
-Cheapest Bedrock model. Perfect for structured reasoning over log data. Free Tier includes Bedrock API access in us-east-1.
+4. **LLM**: Claude 3 Haiku        
+    Cheapest Bedrock model. Perfect for structured reasoning over log data. Free Tier includes Bedrock API access in us-east-1.
 
-5. **Hosting**: Bedrock AgentCore
-Managed agent runtime that handles stateful sessions, tool routing, and invocation — no custom orchestration server needed.
+5. **Hosting**: Bedrock AgentCore     
+    Managed agent runtime that handles stateful sessions, tool routing, and invocation — no custom orchestration server needed.
 
 ## ***NOTE*** : Why Strands SDK over LangChain?   
 - Strands is purpose-built for AWS Bedrock, has zero-config tool registration with Python decorators, and has a much smaller dependency footprint. LangChain works too, but adds 50+ transitive deps for features you won't use here.   

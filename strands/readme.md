@@ -131,7 +131,7 @@ devops-agent/
 </details>
 
 <details>
-  <summary>PHASE 3 : EKS Cluster with Terraform (No Pre-built Modules) </summary>
+  <summary>PHASE 3 : EKS Cluster with Terraform (No Pre-built Modules) --> terraform-cost-optimised</summary>
 
 - Build every resource from scratch
 

@@ -232,7 +232,7 @@ devops-agent/
 
             aws eks update-kubeconfig \
             --region us-east-1 \
-            --name devops-agent-ctr
+            --name devops-agent-cluster
 
             # Expected output:
             # Added new context arn:aws:eks:us-east-1:123456789:cluster/devops-agent to ~/.kube/config

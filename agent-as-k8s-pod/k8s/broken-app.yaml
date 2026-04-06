@@ -1,0 +1,40 @@
+# Deployment: creates and manages the pod
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-api
+  namespace: default
+  labels:
+    app: broken-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broken-api
+  template:
+    metadata:
+      labels:
+        app: broken-api
+    spec:
+      containers:
+      - name: leaky-app
+        image: python:3.11-slim
+                # Inline Python: allocates 1MB every 10ms forever
+                # Will hit the 60Mi limit and get OOMKilled in ~30 seconds
+        command: ["python", "-c"]
+        args:
+        - |
+          import time
+          print("Starting memory leak simulation...")
+          chunks = []
+          while True:
+              chunks.append("x" * 1024 * 1024)  # +1MB each iteration
+              print(f"Allocated {len(chunks)}MB so far")
+              time.sleep(0.01)
+        resources:
+          limits:
+            memory: "60Mi"     # Hard ceiling. OOMKill happens here.
+            cpu:    "100m"
+          requests:
+            memory: "20Mi"     # How much is reserved on the node
+            cpu:    "50m"

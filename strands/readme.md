@@ -1,6 +1,14 @@
 ## What We're Building & Why
 A tool-calling agent that reads K8s pod logs and metrics, identifies root causes (OOMKilled, CrashLoopBackOff, etc.), and autonomously runs remediation — pod restarts, HPA scaling, and alerting.
 
+## what we're building ?
+- A Agent, which runs as a Pod inside Kubernetes.
+- We manage the container, the Dockerfile, the Deployment yaml
+- We own the infrastructure (nodes, networking, scaling)
+- Agent calls Bedrock API to use Claude as its LLM
+- Agent calls Kubernetes API to diagnose and fix pods
+- Invoked via kubectl exec, curl, or port-forward
+
 ## Overview (Creating projct steps)
 1. **Agent Framework**: Strands SDK   
     AWS's open-source Python SDK for building tool-calling agents. Clean, minimal, works natively with Bedrock models and AgentCore.
@@ -224,15 +232,13 @@ devops-agent/
 
     2. **Connect kubectl to your EKS cluster**
         - With kind you ran kind "create cluster" and kubectl auto-configured. With EKS, you run one AWS CLI command that does the same thing — writes a context into your ~/.kube/config.
-        1. Point kubectl at EKS
+        1. Point your local kubectl to EKS
             ```
             # This command fetches the cluster endpoint + auth token from AWS
-            # and writes a new context into ~/.kube/config
+            # and writes a new context into ~/.kube/config to of your local system.
             # It's the EKS equivalent of 'kind create cluster' auto-configuring kubectl
 
-            aws eks update-kubeconfig \
-            --region us-east-1 \
-            --name devops-agent-cluster
+            aws eks update-kubeconfig --region us-east-1 --name devops-agent-cluster
 
             # Expected output:
             # Added new context arn:aws:eks:us-east-1:123456789:cluster/devops-agent to ~/.kube/config
@@ -243,6 +249,7 @@ devops-agent/
             kubectl get nodes
             # NAME                          STATUS   ROLES    AGE   VERSION
             # ip-10-0-1-45.ec2.internal     Ready    <none>   3m    v1.29.x
+            # ip-10-0-1-50.ec2.internal     Ready    <none>   3m    v1.29.x
 
             kubectl get pods -A
             # NAMESPACE     NAME                      READY   STATUS    RESTARTS
@@ -252,7 +259,7 @@ devops-agent/
 
             # Check current context (like 'kind-kind' for kind clusters)
             kubectl config current-context
-            # arn:aws:eks:us-east-1:123456789:cluster/devops-agent
+            # arn:aws:eks:us-east-1:123456789:cluster/devops-agent-cluster
             ```   
         
             It really is that simple. Once update-kubeconfig runs, every kubectl command you know from kind works identically on EKS. The auth happens transparently via your AWS credentials.
@@ -270,9 +277,7 @@ devops-agent/
             kubectl config use-context arn:aws:eks:us-east-1:123456789:cluster/devops-agent
 
             # Tip: alias long EKS context names
-            kubectl config rename-context \
-            arn:aws:eks:us-east-1:123456789:cluster/devops-agent \
-            devops-eks
+            kubectl config rename-context arn:aws:eks:us-east-1:123456789:cluster/devops-agent-cluster devops-eks
             ```
 
     3. **Write the Kubernetes YAML files**   
@@ -318,12 +323,12 @@ devops-agent/
             envsubst < k8s/rbac.yaml | kubectl apply -f -
 
             # Expected output:
-            # serviceaccount/devops-agent created
+            # serviceaccount/devops-agent-sa created
             # clusterrole.rbac.authorization.k8s.io/devops-agent-role created
             # clusterrolebinding.rbac.authorization.k8s.io/devops-agent-binding created
 
             # Verify ServiceAccount was created with the annotation
-            kubectl get serviceaccount devops-agent -o yaml
+            kubectl get serviceaccount devops-agent-sa -o yaml
             # Look for: eks.amazonaws.com/role-arn: arn:aws:iam::...
             ```   
 
@@ -332,23 +337,17 @@ devops-agent/
         4. Build and push the agent image to ECR
             ```
             # Step 1: Authenticate Docker to ECR (token valid 12 hours)
-            aws ecr get-login-password --region us-east-1 | \
-            docker login --username AWS --password-stdin $ECR_URL
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_URL
 
-            # Step 2: Build the agent image
-            # --platform linux/amd64: EKS nodes run x86_64, even on Apple Silicon Macs
-            docker build \
-            --platform linux/amd64 \
-            --tag $ECR_URL:latest \
-            .
+            # Step 2: Build the agent image (Your local docker should be running)
+            # --platform linux/amd64: EKS nodes run x86_64, even on Apple Silicon Macs   
+            docker build --platform linux/amd64 -t $ECR_URL:latest .
 
             # Step 3: Push to ECR
             docker push $ECR_URL:latest
 
             # Verify image is in ECR
-            aws ecr describe-images \
-            --repository-name devops-agent-agent \
-            --query 'imageDetails[*].[imageTags,imageSizeInBytes]'
+            aws ecr describe-images --repository-name devops-agent-cluster-agent --query 'imageDetails[*].[imageTags,imageSizeInBytes]'
             ```
 
         5. Deploy the agent
@@ -364,6 +363,10 @@ devops-agent/
             kubectl rollout status deployment/devops-agent --timeout=120s
             # Waiting for deployment "devops-agent" rollout to finish...
             # deployment "devops-agent" successfully rolled out
+
+            Faced Issues :
+            1. Warning  FailedScheduling  103s  default-scheduler  0/1 nodes are available: 1 Too many pods. no new claims to deallocate, preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod.
+            Resolution : Every pod on EKS needs its own private IP address from the VPC. AWS allocates IPs based on the number of ENIs an instance can hold. t3.micro maxes out at 4 pods total. so changed from desired state of nodes 1 to 2 "aws_eks_node_group"
             ```
 
     5. **Watch the broken app fail in real time**
@@ -433,18 +436,49 @@ devops-agent/
 
     6. **Run the agent and watch it self-heal**   
         Two options: invoke locally (faster for testing), or invoke via the running pod. Both hit the same agent logic.
-        1. Option A: Run agent directly from your laptop (easiest)   
-            This works because: your laptop has AWS credentials + your kubeconfig already points at EKS. The agent Python code uses both — boto3 for Bedrock, kubernetes SDK for K8s API. No pod needed.
+
+        1. Create .venv and install packages
             ```
-            # Make sure you're in the project root with your venv active cd devops-agent/ source venv/bin/activate # or: .venv/bin/activate # Run the agent pointing at your EKS cluster # It uses ~/.kube/config (already pointing at EKS) and your AWS creds python -c " from agent.agent import run_diagnosis result = run_diagnosis( 'Diagnose all pods in the default namespace. ' 'Fix any pods that are failing. ' 'Provide a detailed report of findings and actions taken.' ) print(result) "
+            python -m venv .venv
+
+            source .venv/bin/activate       - Linux 
+            .venv\Scripts\activate          - windows
+            .\.venv\Scripts\Activate.ps1    - powershell
+
+            pip install -r requirements.txt
+
             ```
 
-        2. Option B: Run via the agent pod (production path)   
+        2. Option A: Run agent directly from your laptop (easiest)   
+            This works because: your laptop has AWS credentials + your kubeconfig already points at EKS. The agent Python code uses both — boto3 for Bedrock, kubernetes SDK for K8s API. No pod needed.   
             ```
-            # Get agent pod name AGENT_POD=$(kubectl get pods -l app=devops-agent -o jsonpath='{.items[0].metadata.name}') # Run diagnosis via exec into the agent pod kubectl exec $AGENT_POD -- python -c " from agent.agent import run_diagnosis print(run_diagnosis('Diagnose default namespace and fix failing pods')) " # Or POST to the HTTP endpoint via port-forward kubectl port-forward svc/devops-agent-svc 8080:8080 & curl -s -X POST http://localhost:8080/invocations \ -H 'Content-Type: application/json' \ -d '{"input_text": "Diagnose all pods and fix issues"}' | python -m json.tool
+            # Make sure you're in the project root with your venv active cd devops-agent/ source venv/bin/activate # or: .venv/bin/activate 
+            # Run the agent pointing at your EKS cluster # It uses ~/.kube/config (already pointing at EKS) and your AWS creds. 
+            # Run Below command
+            python -c "
+            from agent.agent import run_diagnosis
+            result = run_diagnosis('Diagnose all pods in the default namespace. Fix any pods that are failing. Provide a detailed report.')
+            print(result)
+            "
+
+            OR
+
+            Refer  : run_local.sh
             ```
 
-        3. What to expect in the agent output
+        3. Option B: Run via the agent pod (production path)   
+            ```
+            # Get agent pod name AGENT_POD=$(kubectl get pods -l app=devops-agent -o jsonpath='{.items[0].metadata.name}') 
+            # Run diagnosis via exec into the agent pod : 
+            kubectl exec $AGENT_POD -- python -c "from agent.agent import run_diagnosis print(run_diagnosis('Diagnose default namespace and fix failing 
+            pods'))" 
+            
+            # Or 
+            
+            POST to the HTTP endpoint via port-forward : kubectl port-forward svc/devops-agent-svc 8080:8080 & curl -s -X POST http://localhost:8080/invocations \ -H 'Content-Type: application/json' \ -d '{"input_text": "Diagnose all pods and fix issues"}' | python -m json.tool
+            ```
+
+        4. What to expect in the agent output
             ```
             Calling tool: get_pods_status(namespace="default")
 
@@ -481,7 +515,7 @@ devops-agent/
             - Fix the memory leak in application code (chunks list never cleared)
             - Add memory usage monitoring alert at 80% of limit
             ```
-        4. Verify the agent's actions worked
+        5. Verify the agent's actions worked
             ```
             # Pod was restarted — you should see a new pod (AGE will be very young)
             kubectl get pods

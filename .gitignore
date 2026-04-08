@@ -1,29 +1,29 @@
 # Local .terraform directories
-agent-as-k8s-pod/terraform-cost-optimised/.terraform/
+agent-as-k8s-pod-strands/terraform-cost-optimised/.terraform/
 
 # .tfstate files (Contains your infrastructure's current state and secrets)
-agent-as-k8s-pod/terraform-cost-optimised/*.tfstate
-agent-as-k8s-pod/terraform-cost-optimised/*.tfstate.*
+agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfstate
+agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfstate.*
 # Crash log files
-agent-as-k8s-pod/terraform-cost-optimised/crash.log
-agent-as-k8s-pod/terraform-cost-optimised/crash.*.log
+agent-as-k8s-pod-strands/terraform-cost-optimised/crash.log
+agent-as-k8s-pod-strands/terraform-cost-optimised/crash.*.log
 
 # Exclude all .tfvars files (Likely to contain sensitive data/secrets)
-agent-as-k8s-pod/terraform-cost-optimised/*.tfvars
-agent-as-k8s-pod/terraform-cost-optimised/*.tfvars.json
+agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfvars
+agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfvars.json
 
 # Ignore override files
-agent-as-k8s-pod/terraform-cost-optimised/override.tf
-agent-as-k8s-pod/terraform-cost-optimised/override.tf.json
-agent-as-k8s-pod/terraform-cost-optimised/*_override.tf
-agent-as-k8s-pod/terraform-cost-optimised/*_override.tf.json
+agent-as-k8s-pod-strands/terraform-cost-optimised/override.tf
+agent-as-k8s-pod-strands/terraform-cost-optimised/override.tf.json
+agent-as-k8s-pod-strands/terraform-cost-optimised/*_override.tf
+agent-as-k8s-pod-strands/terraform-cost-optimised/*_override.tf.json
 
 # Ignore transient lock info files created by terraform apply
-agent-as-k8s-pod/terraform-cost-optimised/.terraform.tfstate.lock.info
+agent-as-k8s-pod-strands/terraform-cost-optimised/.terraform.tfstate.lock.info
 
 # Ignore CLI configuration files
-agent-as-k8s-pod/terraform-cost-optimised/.terraformrc
-agent-as-k8s-pod/terraform-cost-optimised/terraform.rc
+agent-as-k8s-pod-strands/terraform-cost-optimised/.terraformrc
+agent-as-k8s-pod-strands/terraform-cost-optimised/terraform.rc
 
 # virtual environment for python dependencies
-agent-as-k8s-pod/.venv/
+agent-as-k8s-pod-strands/.venv/

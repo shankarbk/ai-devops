@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-api
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broken-api
+  template:
+    metadata:
+      labels:
+        app: broken-api
+    spec:
+      containers:
+      - name: api
+        # This image is intentionally configured to OOMKill
+        # by allocating more memory than the limit allows
+        image: python:3.11-slim
+        command: ["python", "-c"]
+        args:
+        - |
+          # Simulate a memory leak
+          data = []
+          while True:
+            data.append('x' * 1024 * 1024)  # allocate 1MB/iteration
+        resources:
+          limits:
+            memory: "50Mi"   # Will OOMKill quickly
+            cpu:    "100m"
+          requests:
+            memory: "20Mi"
+            cpu:    "50m"
+---
+# RBAC: Give the agent ServiceAccount permission to
+# read pods/logs and manage deployments
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: devops-agent
+  namespace: default
+  annotations:
+    # This annotation links the SA to the IAM role via IRSA
+    eks.amazonaws.com/role-arn: "${AGENT_ROLE_ARN}"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: devops-agent-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "deployments/scale"]
+  verbs: ["get", "list", "patch", "update"]

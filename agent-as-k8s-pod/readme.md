@@ -11,7 +11,7 @@ A tool-calling agent that reads K8s pod logs and metrics, identifies root causes
 
 ## Overview (Creating projct steps)
 1. **Agent Framework**: Strands ***SDK***   
-    AWS's open-source Python SDK for building tool-calling agents. Clean, minimal, works natively with Bedrock models and AgentCore.
+    AWS's open-source Python SDK for building tool-calling agents. Clean, minimal, works natively with Bedrock models and AgentCore.   
 
 2. **Runtime**: EKS on t3.micro   
     Kubernetes cluster via custom Terraform (no pre-built modules). Sized for Free Tier — t3.micro nodes, minimal node group.
@@ -29,6 +29,26 @@ A tool-calling agent that reads K8s pod logs and metrics, identifies root causes
 - Strands is purpose-built for AWS Bedrock, has zero-config tool registration with Python decorators, and has a much smaller dependency footprint. LangChain works too, but adds 50+ transitive deps for features you won't use here.   
 
 - Strands is AWS's own open-source agent SDK. Tools are just Python functions with @tool decorators — the framework reads your docstrings and type hints to auto-generate the JSON schemas the LLM uses to call them. Zero orchestration boilerplate.
+
+- You should use the Strands Agents SDK if you want to build production-ready AI agents quickly by leveraging a "model-driven" approach rather than manually coding every step of a workflow. It is particularly effective for developers working within the AWS ecosystem who need native integration with Amazon Bedrock and built-in observability.
+
+- Key Scenarios for Using Strands SDK
+    - Rapid Prototyping to Production: Use it when you need to move from a basic idea to a deployed, scalable system in days or weeks instead of months.
+    
+    - AWS-Centric Environments: It is the ideal choice if you require native support for Amazon Bedrock, AWS Lambda (for serverless agents), or Amazon Fargate.
+    
+    - Minimal Orchestration Overhead: Choose Strands if you want the LLM to handle the reasoning, planning, and tool selection autonomously without you having to define complex state machines or directed graphs like in LangGraph.
+    
+    - Enterprise Observability Needs: Use it if your production environment requires deep visibility. It comes with built-in OpenTelemetry support, making it easy to trace every model call and tool invocation in real-time.
+
+    - Tool-Heavy Agents: If your agent needs access to thousands of tools, Strands natively supports the Model Context Protocol (MCP), allowing it to instantly connect to a vast library of community and internal tools. 
+
+- Core Features for Development
+    - Pythonic Simplicity: You can turn any Python function into an agent tool using a simple @tool decorator.
+
+    - Steering & Guardrails: It provides "steering hooks" that act like middleware, allowing you to intercept, validate, or require human approval before an agent acts.
+
+    - Multi-Agent Versatility: While simple by default, it supports advanced patterns like "Agents as Tools," hierarchical supervisor models, and collaborative swarms. 
 
 - Why IRSA instead of IAM users?   
 IAM Roles for Service Accounts (IRSA) lets your EKS pod assume an IAM role using Kubernetes's OIDC token — no long-lived credentials stored anywhere. This is the production-correct way to grant pods AWS permissions.

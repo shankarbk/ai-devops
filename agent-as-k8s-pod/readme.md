@@ -10,7 +10,7 @@ A tool-calling agent that reads K8s pod logs and metrics, identifies root causes
 - Invoked via kubectl exec, curl, or port-forward
 
 ## Overview (Creating projct steps)
-1. **Agent Framework**: Strands SDK   
+1. **Agent Framework**: Strands ***SDK***   
     AWS's open-source Python SDK for building tool-calling agents. Clean, minimal, works natively with Bedrock models and AgentCore.
 
 2. **Runtime**: EKS on t3.micro   

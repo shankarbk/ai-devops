@@ -5,6 +5,14 @@ metadata:
   namespace: default
 spec:
   replicas: 1
+
+  # Zero-downtime updates: spin up new pod before killing old one
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
   selector:
     matchLabels:
       app: devops-agent
@@ -13,28 +21,62 @@ spec:
       labels:
         app: devops-agent
     spec:
-            # Use the ServiceAccount we created in rbac.yaml
-      # This gives the pod its RBAC permissions AND triggers IRSA for AWS creds
-      serviceAccountName: devops-agent-sa
+      serviceAccountName: devops-agent
+      restartPolicy: Always           # default, written explicitly for clarity
+      terminationGracePeriodSeconds: 30  # lets in-flight Bedrock calls finish
+
       containers:
       - name: agent
-                # Replace with your ECR URL from: terraform output ecr_repository_url
         image: "${ECR_URL}:latest"
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
+
         env:
         - name: AWS_REGION
           value: "us-east-1"
         - name: K8S_NAMESPACE
           value: "default"
+
         resources:
-          limits:
-            memory: "256Mi"
-            cpu:    "250m"
           requests:
             memory: "128Mi"
-            cpu:    "100m"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"   # OOMKill if exceeded — prevents runaway leaks
+            cpu: "500m"
+
+        # Gives extra time on first boot before liveness kicks in.
+        # Without this, liveness restarts a slow-starting pod in a loop.
+        # 30 attempts × 5s = 150 seconds maximum startup time allowed.
+        startupProbe:
+          httpGet:
+            path: /ping
+            port: 8080
+          failureThreshold: 30
+          periodSeconds: 5
+
+        # Detects hangs — process alive but frozen waiting on Bedrock.
+        # Kills and restarts the pod after 3 consecutive failures (45s).
+        # This is the most important probe to add.
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          failureThreshold: 3
+          timeoutSeconds: 5
+
+        # Stops traffic reaching the pod until it's actually ready.
+        # During a restart, old pod keeps serving until new one passes this.
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
@@ -47,4 +89,18 @@ spec:
   ports:
   - port: 8080
     targetPort: 8080
-  type: ClusterIP     # Internal only — no LoadBalancer cost ($0.025/hr)
+  type: ClusterIP
+---
+# Ensures at least 1 pod stays up during voluntary disruptions
+# (node drain, cluster upgrade). Without this, kubectl drain would
+# kill your only agent pod with no replacement ready.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: devops-agent-pdb
+  namespace: default
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: devops-agent

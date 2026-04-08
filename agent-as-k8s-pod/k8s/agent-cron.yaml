@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: devops-agent-scan
+  namespace: default
+spec:
+  schedule: "*/5 * * * *"       # every 5 minutes
+  concurrencyPolicy: Forbid     # skip if previous run still going
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 240  # kill if not done in 4 min
+      template:
+        spec:
+          serviceAccountName: devops-agent
+          restartPolicy: OnFailure
+          containers:
+          - name: agent
+            image: "${ECR_URL}:latest"
+            command: ["python", "run_agent.py"]
+            args: ["Diagnose all pods in default namespace. Fix any issues."]
+            env:
+            - name: AWS_REGION
+              value: "us-east-1"
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "500m"

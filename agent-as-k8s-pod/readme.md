@@ -350,10 +350,16 @@ devops-agent/
             aws ecr describe-images --repository-name devops-agent-cluster-agent --query 'imageDetails[*].[imageTags,imageSizeInBytes]'
             ```
 
-        5. Deploy the agent
+        5. Deploy the agent   
+            Use the Deployment(k8s/agent-deployment.yaml) if someone calls the agent on demand to fix a specific issue.   
+            Use the CronJob(k8s/agent-cron.yaml) if the agent runs autonomously on a schedule and no human is triggering it. CronJob also sidesteps the "pod is always running" concern entirely — the pod only exists for ~30 seconds per run, crash-restarts are handled by restartPolicy: OnFailure, and there's nothing idle consuming pod slots.   
+            
             ```
             # Substitute ECR_URL into the deployment yaml and apply
             envsubst < k8s/agent-deployment.yaml | kubectl apply -f -
+
+            # Verify probes are wired up
+            kubectl describe pod -l app=devops-agent | grep -A 6 "Liveness\|Readiness\|Startup"
 
             # Expected:
             # deployment.apps/devops-agent created

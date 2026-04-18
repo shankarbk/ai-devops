@@ -1,3 +1,4 @@
+# Gitignore for the project : agent-as-k8s-pod-strands
 # Local .terraform directories
 agent-as-k8s-pod-strands/terraform-cost-optimised/.terraform/
 
@@ -27,3 +28,7 @@ agent-as-k8s-pod-strands/terraform-cost-optimised/terraform.rc
 
 # virtual environment for python dependencies
 agent-as-k8s-pod-strands/.venv/
+
+# Gitignore for the project : agent-as-k8s-pod-strands
+crewai-devops-agent/.venv/**
+crewai-devops-agent/tests/__pycache__/**

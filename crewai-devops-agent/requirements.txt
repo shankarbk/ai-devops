@@ -1,0 +1,28 @@
+# requirements.txt — CrewAI DevOps Agent
+#
+# WHAT CHANGED FROM STRANDS VERSION:
+#   REMOVED: strands-agents
+#   ADDED:   crewai, crewai-tools
+#   KEPT:    bedrock-agentcore, boto3, kubernetes, pydantic, uvicorn
+#
+# CrewAI uses LiteLLM internally to talk to Bedrock — no extra package needed.
+# boto3 is still needed for AWS auth (IRSA credentials in EKS).
+
+# CrewAI framework — includes LiteLLM for Bedrock routing
+crewai>=0.65.0
+crewai-tools>=0.8.0
+
+# AgentCore SDK — wraps the crew in an HTTP server (/invocations + /ping)
+bedrock-agentcore>=1.4.0
+
+# AWS SDK — boto3 picked up by LiteLLM for Bedrock API calls
+boto3>=1.34.0
+
+# Kubernetes Python client — used by all 4 tools
+kubernetes>=29.0.0
+
+# Pydantic v2 — required by CrewAI for task/agent validation
+pydantic>=2.0.0
+
+# ASGI server — started by BedrockAgentCoreApp.run()
+uvicorn>=0.29.0

@@ -1,34 +1,34 @@
-# Gitignore for the project : agent-as-k8s-pod-strands
+# Gitignore for the project : 1.agent-as-k8s-pod-strands
 # Local .terraform directories
-agent-as-k8s-pod-strands/terraform-cost-optimised/.terraform/
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/.terraform/
 
 # .tfstate files (Contains your infrastructure's current state and secrets)
-agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfstate
-agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfstate.*
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfstate
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfstate.*
 # Crash log files
-agent-as-k8s-pod-strands/terraform-cost-optimised/crash.log
-agent-as-k8s-pod-strands/terraform-cost-optimised/crash.*.log
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/crash.log
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/crash.*.log
 
 # Exclude all .tfvars files (Likely to contain sensitive data/secrets)
-agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfvars
-agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfvars.json
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfvars
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/*.tfvars.json
 
 # Ignore override files
-agent-as-k8s-pod-strands/terraform-cost-optimised/override.tf
-agent-as-k8s-pod-strands/terraform-cost-optimised/override.tf.json
-agent-as-k8s-pod-strands/terraform-cost-optimised/*_override.tf
-agent-as-k8s-pod-strands/terraform-cost-optimised/*_override.tf.json
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/override.tf
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/override.tf.json
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/*_override.tf
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/*_override.tf.json
 
 # Ignore transient lock info files created by terraform apply
-agent-as-k8s-pod-strands/terraform-cost-optimised/.terraform.tfstate.lock.info
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/.terraform.tfstate.lock.info
 
 # Ignore CLI configuration files
-agent-as-k8s-pod-strands/terraform-cost-optimised/.terraformrc
-agent-as-k8s-pod-strands/terraform-cost-optimised/terraform.rc
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/.terraformrc
+1.agent-as-k8s-pod-strands/terraform-cost-optimised/terraform.rc
 
 # virtual environment for python dependencies
-agent-as-k8s-pod-strands/.venv/
+1.agent-as-k8s-pod-strands/.venv/
 
-# Gitignore for the project : agent-as-k8s-pod-strands
-crewai-devops-agent/.venv/**
-crewai-devops-agent/tests/__pycache__/**
+# Gitignore for the project : 2.crewai-devops-agent
+2.crewai-devops-agent/.venv/**
+2.crewai-devops-agent/tests/__pycache__/**

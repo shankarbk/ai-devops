@@ -645,13 +645,6 @@ It's AWS's managed platform for hosting AI agents. You push your agent code as a
 
 </details>
 
-
-
-
-
-
-
-
 ## Free Tier & Cost Management
 Every resource decision made in this guide is cost-optimized. Here's the full breakdown with strategies to minimize spend.
 
@@ -698,3 +691,23 @@ enabled_cluster_log_types = []  # options: api, audit, authenticator, controller
     - Day 3: Create EKS, deploy broken app, invoke agent locally → destroy EKS (~$2 total)
     - Day 4: Full AgentCore deploy for 2 hours → destroy (~$0.80 total)   
     Total estimated spend for complete hands-on: ~$5–10
+
+## WHAT WE BUILT ?   
+- EKS deployment — what you built
+    - Your agent runs as a Pod inside Kubernetes
+    - You manage the container, the Dockerfile, the Deployment yaml
+    - You own the infrastructure (nodes, networking, scaling)
+    - Agent calls Bedrock API to use Claude as its LLM
+    - Agent calls Kubernetes API to diagnose and fix pods
+    - Invoked via kubectl exec, curl, or port-forward
+
+- We built the right thing. EKS deployment is a complete, production-valid architecture for a K8s diagnostic agent. The agent lives inside the cluster it's managing — that's actually the correct design, not a compromise.
+
+- Why Not we built on AgentCore ?   
+    - AgentCore is not "better" — it's different. It's a serverless hosting platform for agents that need a public HTTPS endpoint, zero idle cost, and built-in session management. The tradeoff is that reaching your EKS cluster from AgentCore requires extra VPC configuration, which makes it more complex for this specific use case.
+
+    - The agent code is 100% identical either way. The @tool functions, the Strands SDK, the Bedrock calls — none of that changes. You'd only swap how you invoke the agent (kubectl exec vs an HTTPS endpoint).
+
+## Next Step :
+Deploy the same application using different framework : CrewAI
+visit the project directory : [agent-as-k8s-pod-crewai](/agent-as-k8s-pod-crewai/readme.md)
